@@ -273,7 +273,7 @@ plt.title('Maximum Absolute Error - CountMin Sketch')
 plt.show()
 
 # 4c
-chosen_w, chosen_d = 4000, 4
+chosen_w, chosen_d = 22000, 4
 
 # Run CountMin Sketch with chosen parameters and report frequencies of words with true frequency > 5000
 cms = CountMinSketch(chosen_w, chosen_d)
