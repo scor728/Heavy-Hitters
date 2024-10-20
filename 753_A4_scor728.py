@@ -275,14 +275,12 @@ plt.show()
 # 4c
 chosen_w, chosen_d = 22000, 4
 
-# Run CountMin Sketch with chosen parameters and report frequencies of words with true frequency > 5000
+# Run CountMinSketch with selected w and d values
 cms = CountMinSketch(chosen_w, chosen_d)
 for word in word_stream:
     cms.update(word)
 
-print("Updated Words, About to estimate word counts")
-
-# Estimate the frequency of words whose true frequency is above 5000
+# Estimate frequency of words with true frequency > 5000
 high_freq_words = [word for word, count in true_counter.items() if count > 5000]
 estimated_high_freqs = {word: cms.estimate(word) for word in high_freq_words}
 
