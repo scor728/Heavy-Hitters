@@ -24,9 +24,9 @@ word_count = sum(word_counter.values())
 unique_word_count = len(word_counter)
 average_frequency = word_count / unique_word_count
 
-print("Word Count:",  word_count)
-print(f"Unique words:", unique_word_count)
-print(f"Average word frequency:", average_frequency)
+print("\nWord Count:",  word_count)
+print("Unique words:", unique_word_count)
+print("Average word frequency:", average_frequency)
 
 # 1b
 sorted_word_count = sorted(word_counter.values(), reverse=True) # Descending order
@@ -42,30 +42,19 @@ plt.title('True Word Frequency Distribution')
 plt.grid(True)
 plt.show()
 
-# Task 2 - Reservoir Sampling
 
-# Step 2: Define Reservoir Sampling function
-def reservoir_sampling(stream, sample_size):
-    """
-    Perform reservoir sampling on a stream of words.
-    
-    Parameters:
-    - stream: An iterable of words (the word stream).
-    - sample_size: The size of the reservoir.
-    
-    Returns:
-    - A sample of words with the specified size.
-    - The number of replacements that occurred during sampling.
-    """
+
+# Task 2 - Reservoir Sampling
+def reservoir_sample(stream, sample_size):
     reservoir = []
     num_replacements = 0
 
     # Process each word in the stream
     for i, word in enumerate(stream):
         if i < sample_size:
-            reservoir.append(word)  # Fill the reservoir initially
+            reservoir.append(word)  # Fill the reservoir
         else:
-            # Randomly decide if the new element should replace an existing one
+            # Randomly replace words in the reservoir
             j = random.randint(0, i)
             if j < sample_size:
                 reservoir[j] = word
@@ -73,99 +62,95 @@ def reservoir_sampling(stream, sample_size):
 
     return reservoir, num_replacements
 
-# Step 3: Prepare the word stream from the dataset
-# Concatenate all words from each article into a single stream of words
+# Concatenate all words into a stream (different to the word counter)
 word_stream = []
 for words in df['words']:
     word_stream.extend(words.split())
 
-# Step 4a: Perform reservoir sampling and analyze frequency distribution
+# Perform sampling with a size of 10000
 sample_size = 10000
-sample, replacements = reservoir_sampling(word_stream, sample_size)
+sample, replacements = reservoir_sample(word_stream, sample_size)
 
+# 2a
 # Compute the estimated frequencies from the sample
 sample_counter = Counter(sample)
 sorted_sample_counts = sorted(sample_counter.values(), reverse=True)
 
 # Plot the estimated frequencies
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=figure_size)
 plt.plot(sorted_sample_counts)
 plt.xlabel('Words (ranked by frequency)')
 plt.ylabel('Estimated Frequency')
-plt.title('Estimated Word Frequency Distribution from Reservoir Sampling')
+plt.title('Estimated Word Frequency Distribution - Reservoir Sampling (s=10000)')
 plt.grid(True)
 plt.show()
 
-print(f"Number of replacements in one run: {replacements}")
+print("\nNumber of replacements (1 run):", replacements)
 
-# Step 4b: Run Reservoir Sampling 5 times and calculate the average replacements
+# 2b
 num_runs = 5
 replacement_counts = []
 
 for _ in range(num_runs):
-    _, replacements = reservoir_sampling(word_stream, sample_size)
+    _, replacements = reservoir_sample(word_stream, sample_size)
     replacement_counts.append(replacements)
 
-# Calculate the average number of replacements
+# Find the average number of replacements
 average_replacements = sum(replacement_counts) / num_runs
 
-print(f"Replacements over 5 runs: {replacement_counts}")
-print(f"Average number of replacements over 5 runs: {average_replacements}")
+print("\nReplacements over 5 runs:", replacement_counts)
+print("Average Replacements:", average_replacements)
 
 
-# Step 3: Implement the Misra-Gries algorithm
-def misra_gries(stream, k):
-    """
-    Misra-Gries algorithm to find frequent elements.
-    Parameters:
-    - stream: An iterable of words.
-    - k: Size of the summary.
-    Returns:
-    - A dictionary with estimated frequencies of words.
-    - The number of decrement steps.
-    """
+
+# Task 3 - Misra-Gries Algorithm
+def misra_gries(word_stream, k):
     summary = {}
-    num_decrements = 0
+    decrements = 0
 
-    for word in stream:
-        if word in summary:
+    for word in word_stream:
+        if word in summary: # Word exists in summary
             summary[word] += 1
-        elif len(summary) < k:
+        elif len(summary) < k: # Summary is not full yet
             summary[word] = 1
-        else:
-            # Decrement counts for all words
+        else: # Summary is full
+            # Decrement every word count
             for key in list(summary.keys()):
                 summary[key] -= 1
+
+                # Remove words with count 0
                 if summary[key] == 0:
                     del summary[key]
-                    num_decrements += 1
+                    decrements += 1
 
     # Adjust the summary to hold the approximate counts
+
+    scale_factor = len(word_stream) // k
     for key in summary:
-        summary[key] *= len(stream) // k
+        summary[key] *= scale_factor
 
-    return summary, num_decrements
+    return summary, decrements
 
-# Step 4a: Run Misra-Gries with k=1000 and plot estimated frequencies
+# 3a
 k = 1000
 mg_summary, num_decrements = misra_gries(word_stream, k)
 
-# Convert the summary to a Counter for easier analysis
+# convert to counter
 mg_counter = Counter(mg_summary)
 sorted_mg_counts = sorted(mg_counter.values(), reverse=True)
 
 # Plot the estimated frequencies in descending order
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=figure_size)
 plt.plot(sorted_mg_counts)
 plt.xlabel('Words (ranked by frequency)')
 plt.ylabel('Estimated Frequency')
-plt.title('Estimated Word Frequency Distribution from Misra-Gries (k=1000)')
+plt.title('Estimated Word Frequency Distribution - Misra-Gries (k=1000)')
 plt.grid(True)
 plt.show()
 
-print(f"Number of decrement steps for k=1000: {num_decrements}")
+print("\nDecrement steps (k=1000):", num_decrements)
 
-# Step 4b: Evaluate the impact of varying k on the maximum absolute error
+# 3b
 k_values = [2000, 4000, 6000, 8000, 10000]
 max_errors = []
 
@@ -178,30 +163,24 @@ for k in k_values:
     max_errors.append(max_error)
 
 # Plot the maximum absolute error vs. summary size k
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=figure_size)
 plt.plot(k_values, max_errors, marker='o')
 plt.xlabel('Summary size (k)')
 plt.ylabel('Maximum Absolute Error')
-plt.title('Impact of Summary Size on Maximum Absolute Error (Misra-Gries)')
+plt.title('Summary Size vs Maximum Error (Misra-Gries)')
 plt.grid(True)
 plt.show()
 
-print(f"Maximum absolute errors for k values {k_values}: {max_errors}")
-
-# Step 4c: Explanation for choosing k to find frequent words (>5000 occurrences)
-# If we want to capture words with frequency > 5000, a common approach is to set k such that
-# it can represent 1 / k fraction of the total stream length. Since the stream has a large number
-# of words, choosing k to be in the range of 2000 to 4000 should be reasonable.
-
+# 3c
 chosen_k = 4000
-print(f"For words with frequency > 5000, a suitable k might be around {chosen_k}.")
 
-# Step 4d: Run Misra-Gries with the chosen k and report decrement steps
+# 3d
 mg_summary_chosen, num_decrements_chosen = misra_gries(word_stream, chosen_k)
-print(f"Number of decrement steps for chosen k={chosen_k}: {num_decrements_chosen}")
+print(f"\nNumber of decrement steps for chosen k={chosen_k}: {num_decrements_chosen}")
 
 
-# TASK 4 ....
+
+# TASK 4 - CountMin Sketch
 
 
 # Step 3: Implement the CountMin Sketch algorithm
