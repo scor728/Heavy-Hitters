@@ -6,6 +6,10 @@ from collections import Counter, defaultdict
 import random
 import hashlib
 
+# Samuel Cordner
+# scor728
+# 808836611
+
 # Task 0 - Dataset Preprocessing
 # Load the dataset
 df = pd.read_csv('arxiv.txt', sep='\t', header=None, names=['article_id', 'words', 'date'])
@@ -71,6 +75,10 @@ for words in df['words']:
 sample_size = 10000
 sample, replacements = reservoir_sample(word_stream, sample_size)
 
+scale_factor = word_count // sample_size
+for s in sample:
+    s = s * scale_factor
+
 # 2a
 # Compute the estimated frequencies from the sample
 sample_counter = Counter(sample)
@@ -115,13 +123,14 @@ def misra_gries(word_stream, k):
             summary[word] = 1
         else: # Summary is full
             # Decrement every word count
+            decrements += 1
             for key in list(summary.keys()):
                 summary[key] -= 1
-
+                
                 # Remove words with count 0
                 if summary[key] == 0:
                     del summary[key]
-                    decrements += 1
+                    
 
     # Adjust the summary to hold the approximate counts
 
@@ -172,7 +181,7 @@ plt.grid(True)
 plt.show()
 
 # 3c
-chosen_k = 4000
+chosen_k = 500
 
 # 3d
 mg_summary_chosen, num_decrements_chosen = misra_gries(word_stream, chosen_k)
@@ -180,33 +189,37 @@ print(f"\nNumber of decrement steps for chosen k={chosen_k}: {num_decrements_cho
 
 
 
-# TASK 4 - CountMin Sketch
-
-
-# Step 3: Implement the CountMin Sketch algorithm
+# Task 4 - CountMin Sketch
+# Complexity of managing multiple data structures necessitates setting up a class
 class CountMinSketch:
     def __init__(self, w, d):
-        self.w = w  # number of buckets
-        self.d = d  # number of hash functions
+        self.w = w  # buckets
+        self.d = d  # hash functions
         self.table = np.zeros((d, w), dtype=int)
-        self.hash_seeds = [i * 100 + 7 for i in range(d)]  # using distinct seeds for hash functions
+        self.hash_seeds = [i * 100 + 7 for i in range(d)]  # using distinct seeds for hash functions (ensure they are different)
 
+    # Create unique hash from word and seed
     def _hash(self, word, seed):
         return int(hashlib.md5(f"{word}{seed}".encode()).hexdigest(), 16) % self.w
 
+    # Increment given counts for word in the sketch
     def update(self, word):
         for i in range(self.d):
+            # Hash value varies based on given hash function
             hash_value = self._hash(word, self.hash_seeds[i])
             self.table[i][hash_value] += 1
 
+
     def estimate(self, word):
+        # Go through all hash values for the given word
         estimates = [
             self.table[i][self._hash(word, self.hash_seeds[i])]
             for i in range(self.d)
         ]
+        # Return minimum estimate (to mitigate collisions)
         return min(estimates)
 
-# Step 4a: Run CountMin Sketch with w=2000, d=2
+# 4a
 w, d = 2000, 2
 cms = CountMinSketch(w, d)
 
@@ -219,28 +232,27 @@ estimated_freqs = defaultdict(int)
 for word in set(word_stream):
     estimated_freqs[word] = cms.estimate(word)
 
-# Sort estimated frequencies in descending order
-sorted_estimated_freqs = sorted(estimated_freqs.values(), reverse=True)
+sorted_estimated_freqs = sorted(estimated_freqs.values(), reverse=True) # Descending order
 
 # Plot the estimated frequencies
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=figure_size)
 plt.plot(sorted_estimated_freqs)
 plt.xlabel('Words (ranked by estimated frequency)')
 plt.ylabel('Estimated Frequency')
-plt.title(f'Estimated Word Frequency Distribution from CountMin Sketch (w={w}, d={d})')
+plt.title(f'Estimated Word Frequency - CountMin Sketch (w={w}, d={d})')
 plt.grid(True)
 plt.show()
 
-# Step 4b: Investigate impact of varying w and d on maximum absolute error
+# 4b
 w_values = [2000, 4000, 6000, 8000, 10000]
 d_values = [2, 4, 8, 16]
 true_counter = Counter(word_stream)
 
-# Store maximum errors for each combination of w and d
+# Store Maximum errors for each pair of w and d values
 error_matrix = np.zeros((len(d_values), len(w_values)))
 
 for i, d in enumerate(d_values):
-    print("d = ", d)
+    print("\nd = ", d)
     for j, w in enumerate(w_values):
         print("w = ", w)
         cms = CountMinSketch(w, d)
@@ -252,25 +264,17 @@ for i, d in enumerate(d_values):
         )
         error_matrix[i][j] = max_error
 
-# Plot the heatmap of maximum absolute error
-plt.figure(figsize=(10, 6))
+# Plot Maximum Absolute Error Heatmap
+plt.figure(figsize=figure_size)
 sns.heatmap(error_matrix, xticklabels=w_values, yticklabels=d_values, annot=True, fmt='.0f', cmap='viridis')
 plt.xlabel('Number of buckets (w)')
 plt.ylabel('Number of hash functions (d)')
-plt.title('Maximum Absolute Error for CountMin Sketch')
+plt.title('Maximum Absolute Error - CountMin Sketch')
 plt.show()
 
-# Step 4c: Explanation for choosing w and d
-# To keep the error below 100 with high probability (more than 90%), we select w and d based on
-# the error formula. The error is inversely proportional to w and decreases with higher d.
-# With high probability (1 - (1/e^d)), the error is bounded by the stream size/w.
-
-# For a stream size of 200,000 and error threshold 100:
-# Choose w such that 200000/w <= 100. Thus, w >= 2000.
-# To ensure a 90% probability, use d >= 4.
+# 4c
 chosen_w, chosen_d = 4000, 4
 
-print("About to run CMS")
 # Run CountMin Sketch with chosen parameters and report frequencies of words with true frequency > 5000
 cms = CountMinSketch(chosen_w, chosen_d)
 for word in word_stream:
@@ -282,6 +286,6 @@ print("Updated Words, About to estimate word counts")
 high_freq_words = [word for word, count in true_counter.items() if count > 5000]
 estimated_high_freqs = {word: cms.estimate(word) for word in high_freq_words}
 
-print(f"Estimated frequencies for words with true frequency > 5000 using CountMin Sketch (w={chosen_w}, d={chosen_d}):")
+print(f"\nEstimated frequencies for words with true frequency > 5000 using CountMin Sketch (w={chosen_w}, d={chosen_d}):")
 for word, est_freq in estimated_high_freqs.items():
     print(f"{word}: {est_freq}")
