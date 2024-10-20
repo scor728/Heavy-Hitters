@@ -283,6 +283,7 @@ for word in word_stream:
 high_freq_words = [word for word, count in true_counter.items() if count > 5000]
 estimated_high_freqs = {word: cms.estimate(word) for word in high_freq_words}
 
+# Display Frequency Estimates
 print(f"\nEstimated frequencies for words with true frequency > 5000 using CountMin Sketch (w={chosen_w}, d={chosen_d}):")
 for word, est_freq in estimated_high_freqs.items():
     print(f"{word}: {est_freq}")
