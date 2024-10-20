@@ -132,8 +132,7 @@ def misra_gries(word_stream, k):
                     del summary[key]
                     
 
-    # Adjust the summary to hold the approximate counts
-
+    # Adjust summary counts to given scale
     scale_factor = len(word_stream) // k
     for key in summary:
         summary[key] *= scale_factor
@@ -163,8 +162,8 @@ print("\nDecrement steps (k=1000):", num_decrements)
 k_values = [2000, 4000, 6000, 8000, 10000]
 max_errors = []
 
-# True word frequencies using Counter
-true_counter = Counter(word_stream)
+# Rename for clarity
+true_counter = word_counter
 
 for k in k_values:
     mg_summary, _ = misra_gries(word_stream, k)
