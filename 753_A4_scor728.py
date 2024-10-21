@@ -49,22 +49,23 @@ plt.show()
 
 
 # Task 2 - Reservoir Sampling
-def reservoir_sample(stream, sample_size):
+def reservoir_sample(words, reservoir_size):
     reservoir = []
-    num_replacements = 0
+    replacement_count = 0
 
     # Process each word in the stream
-    for i, word in enumerate(stream):
-        if i < sample_size:
+    for i, word in enumerate(words):
+        if i < reservoir_size:
             reservoir.append(word)  # Fill the reservoir
         else:
             # Randomly replace words in the reservoir
             j = random.randint(0, i)
-            if j < sample_size:
-                reservoir[j] = word
-                num_replacements += 1
 
-    return reservoir, num_replacements
+            if j < reservoir_size:
+                reservoir[j] = word
+                replacement_count += 1
+
+    return reservoir, replacement_count
 
 # Concatenate all words into a stream (different to the word counter)
 word_stream = []
@@ -96,15 +97,15 @@ plt.show()
 print("\nNumber of replacements (1 run):", replacements)
 
 # 2b
-num_runs = 5
+runs = 5
 replacement_counts = []
 
-for _ in range(num_runs):
+for i in range(runs):
     _, replacements = reservoir_sample(word_stream, sample_size)
     replacement_counts.append(replacements)
 
 # Find the average number of replacements
-average_replacements = sum(replacement_counts) / num_runs
+average_replacements = sum(replacement_counts) / runs
 
 print("\nReplacements over 5 runs:", replacement_counts)
 print("Average Replacements:", average_replacements)
@@ -112,62 +113,65 @@ print("Average Replacements:", average_replacements)
 
 
 # Task 3 - Misra-Gries Algorithm
-def misra_gries(word_stream, k):
-    summary = {}
-    decrements = 0
+def misra_gries(words, k):
+    summary_object = {}
+    decrement_count = 0
 
-    for word in word_stream:
-        if word in summary: # Word exists in summary
-            summary[word] += 1
-        elif len(summary) < k: # Summary is not full yet
-            summary[word] = 1
+    for word in words:
+        if word in summary_object: # Word exists in summary
+            summary_object[word] += 1
+
+        elif len(summary_object) < k: # Summary is not full yet
+            summary_object[word] = 1
+
         else: # Summary is full
+
             # Decrement every word count
-            decrements += 1
-            for key in list(summary.keys()):
-                summary[key] -= 1
+            decrement_count += 1
+            for key in list(summary_object.keys()):
+                summary_object[key] -= 1
                 
                 # Remove words with count 0
-                if summary[key] == 0:
-                    del summary[key]
+                if summary_object[key] == 0:
+                    del summary_object[key]
                     
 
     # Adjust summary counts to given scale
-    scale_factor = len(word_stream) // k
-    for key in summary:
-        summary[key] *= scale_factor
+    scale_factor = len(words) // k
+    for key in summary_object:
+        summary_object[key] *= scale_factor
 
-    return summary, decrements
+    return summary_object, decrement_count
 
 # 3a
 k = 1000
-mg_summary, num_decrements = misra_gries(word_stream, k)
+summary, decrement_count = misra_gries(word_stream, k)
 
 # convert to counter
-mg_counter = Counter(mg_summary)
-sorted_mg_counts = sorted(mg_counter.values(), reverse=True)
+counter = Counter(summary)
+sorted_counts = sorted(counter.values(), reverse=True)
 
 # Plot the estimated frequencies in descending order
 plt.figure(figsize=figure_size)
-plt.plot(sorted_mg_counts)
+plt.plot(sorted_counts)
 plt.xlabel('Words (ranked by frequency)')
 plt.ylabel('Estimated Frequency')
 plt.title('Estimated Word Frequency Distribution - Misra-Gries (k=1000)')
 plt.grid(True)
 plt.show()
 
-print("\nDecrement steps (k=1000):", num_decrements)
+print("\nDecrement steps (k=1000):", decrement_count)
 
 # 3b
 k_values = [2000, 4000, 6000, 8000, 10000]
 max_errors = []
 
 # Rename for clarity
-true_counter = word_counter
+true_word_counts = word_counter
 
 for k in k_values:
-    mg_summary, _ = misra_gries(word_stream, k)
-    max_error = max(abs(true_counter[word] - mg_summary.get(word, 0)) for word in true_counter)
+    summary, _ = misra_gries(word_stream, k)
+    max_error = max(abs(true_word_counts[word] - summary.get(word, 0)) for word in true_word_counts)
     max_errors.append(max_error)
 
 # Plot the maximum absolute error vs. summary size k
@@ -183,53 +187,51 @@ plt.show()
 chosen_k = 500
 
 # 3d
-mg_summary_chosen, num_decrements_chosen = misra_gries(word_stream, chosen_k)
-print(f"\nNumber of decrement steps for chosen k={chosen_k}: {num_decrements_chosen}")
+chosen_summary, chosen_decrements = misra_gries(word_stream, chosen_k)
+print(f"\nNumber of decrement steps for chosen k={chosen_k}: {chosen_decrements}")
 
 
 
 # Task 4 - CountMin Sketch
-# Complexity of managing multiple data structures necessitates setting up a class
-class CountMinSketch:
-    def __init__(self, w, d):
-        self.w = w  # buckets
-        self.d = d  # hash functions
-        self.table = np.zeros((d, w), dtype=int)
-        self.hash_seeds = [i * 100 + 7 for i in range(d)]  # using distinct seeds for hash functions (ensure they are different)
 
-    # Create unique hash from word and seed
-    def _hash(self, word, seed):
-        return int(hashlib.md5(f"{word}{seed}".encode()).hexdigest(), 16) % self.w
+# Create unique hash from word and seed
+def generate_hash(word, seed, w):
+    value = int(hashlib.md5(f"{word}{seed}".encode()).hexdigest(), 16)
+    return value % w
 
-    # Increment given counts for word in the sketch
-    def update(self, word):
-        for i in range(self.d):
-            # Hash value varies based on given hash function
-            hash_value = self._hash(word, self.hash_seeds[i])
-            self.table[i][hash_value] += 1
+ # Increment given counts for word in the sketch
+def update_table(word, table, hash_function_seeds, d, w):
+    for i in range(d):
+        # Hash value varies based on given hash function
+        hash_value = generate_hash(word, hash_function_seeds[i], w)
+        table[i][hash_value] += 1
 
+def estimate_word(word, table, hash_function_seeds, d, w):
+    # Go through all hash values for the given word
+    estimates = [table[i][generate_hash(word, hash_function_seeds[i], w)] for i in range(d)]
+    # Return minimum estimate (to mitigate collisions)
+    return min(estimates)
 
-    def estimate(self, word):
-        # Go through all hash values for the given word
-        estimates = [
-            self.table[i][self._hash(word, self.hash_seeds[i])]
-            for i in range(self.d)
-        ]
-        # Return minimum estimate (to mitigate collisions)
-        return min(estimates)
+def setup_table(w, d):
+    return np.zeros((d, w), dtype=int)
+
+def setup_hash_function_seeds(d):
+    return [i * 100 + 7 for i in range(d)] # using distinct seeds for hash functions (ensure they are different)
 
 # 4a
 w, d = 2000, 2
-cms = CountMinSketch(w, d)
+table = setup_table(w, d)
+hash_function_seeds = setup_hash_function_seeds(d)
 
 # Update CMS with the word stream
 for word in word_stream:
-    cms.update(word)
+    update_table(word, table, hash_function_seeds, d, w)
+
 
 # Estimate frequencies of words using CMS
 estimated_freqs = defaultdict(int)
 for word in set(word_stream):
-    estimated_freqs[word] = cms.estimate(word)
+    estimated_freqs[word] = estimate_word(word, table, hash_function_seeds, d, w)
 
 sorted_estimated_freqs = sorted(estimated_freqs.values(), reverse=True) # Descending order
 
@@ -254,11 +256,15 @@ for i, d in enumerate(d_values):
     print("\nd = ", d)
     for j, w in enumerate(w_values):
         print("w = ", w)
-        cms = CountMinSketch(w, d)
+
+        table = setup_table(w, d)
+        hash_function_seeds = setup_hash_function_seeds(d)
+
         for word in word_stream:
-            cms.update(word)
+            update_table(word, table, hash_function_seeds, d, w)
+
         max_error = max(
-            abs(true_counter[word] - cms.estimate(word))
+            abs(true_counter[word] - estimate_word(word, table, hash_function_seeds, d, w))
             for word in true_counter
         )
         error_matrix[i][j] = max_error
@@ -275,15 +281,19 @@ plt.show()
 chosen_w, chosen_d = 22000, 4
 
 # Run CountMinSketch with selected w and d values
-cms = CountMinSketch(chosen_w, chosen_d)
+
+table = setup_table(chosen_w, chosen_d)
+hash_function_seeds = setup_hash_function_seeds(chosen_d)
+
+
 for word in word_stream:
-    cms.update(word)
+    update_table(word, table, hash_function_seeds, chosen_d, chosen_w)
 
 # Estimate frequency of words with true frequency > 5000
-high_freq_words = [word for word, count in true_counter.items() if count > 5000]
-estimated_high_freqs = {word: cms.estimate(word) for word in high_freq_words}
+freq_words = [word for word, count in true_counter.items() if count > 5000]
+estimated_word_freqs = {word: estimate_word(word, table, hash_function_seeds, chosen_d, chosen_w) for word in freq_words}
 
 # Display Frequency Estimates
 print(f"\nEstimated frequencies for words with true frequency > 5000 using CountMin Sketch (w={chosen_w}, d={chosen_d}):")
-for word, est_freq in estimated_high_freqs.items():
-    print(f"{word}: {est_freq}")
+for word, estimated_freq in estimated_word_freqs.items():
+    print(f"{word}: {estimated_freq}")
